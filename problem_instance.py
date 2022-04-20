@@ -9,24 +9,19 @@ class ProblemInstance:
     for the problem instance
     """
 
-    def __init__(self, max_quantity=5, api_key=None) -> None:
+    def __init__(self, max_quantity=5, filename="./data/order_data.xlsx", source="google_api", api_key=None) -> None:
         """
         initial the problem instance
         """
         self.max_quantity = max_quantity
 
-        filename = "./data/order_data.xlsx"
         self.pickup_location = pd.read_excel(filename, sheet_name='訂單取貨點')
         self.delivery_location = pd.read_excel(filename, sheet_name='顧客點')
         self.product_list = pd.read_excel(filename, sheet_name='貨物')
 
         self.candidates_of_pickup_location = self.pickup_location.shape[0]
-        self.candidates_of_devlivery_location = self.delivery_location.shape[0]
+        self.candidates_of_delivery_location = self.delivery_location.shape[0]
         self.num_of_product = self.product_list.shape[0]
-
-        self.product_list['貨物名稱'][0:5].fillna('冰箱', inplace=True)
-        self.product_list['貨物名稱'][6:11].fillna('冷氣', inplace=True)
-        self.product_list['貨物名稱'][10:15].fillna('洗衣機', inplace=True)
 
         self.time_period = {
             'morning': {
@@ -42,7 +37,7 @@ class ProblemInstance:
             columns=['pickup_location_id', 'pk_addr', 'pk_lon', 'pk_lat', 'pk_tw', 'order_detail', 'delivery_location_id',  'dl_addr', 'dl_lon', 'dl_lat', 'dl_tw'])
 
         self.service_address_query = ServiceAddressQuery(
-            source="google_api", api_key=api_key)
+            source=source, api_key=api_key)
 
         pass
 
@@ -142,18 +137,15 @@ class ProblemInstance:
             "pickup_location_id": random.randrange(0, self.candidates_of_pickup_location),
             "pk_tw": random.randrange(self.time_period[period]['start'], self.time_period[period]['end'], 1),
             "order_detail": products,
-            "delivery_location_id": random.randrange(0, self.candidates_of_devlivery_location),
+            "delivery_location_id": random.randrange(0, self.candidates_of_delivery_location),
             "dl_tw": random.randrange(self.time_period[period]['start'], self.time_period[period]['end'], 1),
         }
         data_point["pk_addr"] = self.__get_address(
             type="pickup", id=data_point['pickup_location_id'])
         data_point["dl_addr"] = self.__get_address(
             type="delivery", id=data_point['delivery_location_id'])
-
-        pk_geocode = self.service_address_query.query_geocoding_pipeline(
-            data_point['pk_addr'])
-        data_point['pk_lon'] = pk_geocode[0]
-        data_point['pk_lat'] = pk_geocode[1]
+        data_point['pk_lon'] = self.pickup_location.loc[data_point['pickup_location_id']]['longitude']
+        data_point['pk_lat'] = self.pickup_location.loc[data_point['pickup_location_id']]['latitude']
         dl_geocode = self.service_address_query.query_geocoding_pipeline(
             data_point['dl_addr'])
         data_point['dl_lon'] = dl_geocode[0]
@@ -174,5 +166,7 @@ class ProblemInstance:
         self.problem_instance.reset_index(inplace=True, drop=True)
         return self.problem_instance
 
-    def output_generate_instance(self):
-        self.problem_instance.to_csv('n' + str(self.instance_size)+'.csv')
+    def output_generate_instance(self, filename=""):
+        if filename == "":
+            filename = 'n' + str(self.instance_size)+'.csv'
+        self.problem_instance.to_csv(filename)
